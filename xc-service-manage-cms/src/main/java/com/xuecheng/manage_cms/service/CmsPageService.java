@@ -2,7 +2,9 @@ package com.xuecheng.manage_cms.service;
 
 import com.xuecheng.framework.domain.cms.CmsPage;
 import com.xuecheng.framework.domain.cms.request.QueryPageRequest;
+import com.xuecheng.framework.domain.cms.response.CmsCode;
 import com.xuecheng.framework.domain.cms.response.CmsPageResult;
+import com.xuecheng.framework.exception.ExceptionCast;
 import com.xuecheng.framework.model.response.CommonCode;
 import com.xuecheng.framework.model.response.QueryResponseResult;
 import com.xuecheng.framework.model.response.QueryResult;
@@ -69,14 +71,14 @@ public class CmsPageService {
         //查询页面是否存在，这里以页面名称，站点id，页面path作为唯一主键来查询页面是否存在
         CmsPage cmsPage1 = cmsPageRepository.findByPageNameAndAndSiteIdAndPageWebPath(cmsPage.getPageName(),
                 cmsPage.getSiteId(), cmsPage.getPageWebPath());
-        if(cmsPage1 == null){
-            cmsPage.setPageId(null);//添加页面主键由spring data 自动生成
-            cmsPageRepository.save(cmsPage);
-            //返回结果
-            CmsPageResult cmsPageResult = new CmsPageResult(CommonCode.SUCCESS,cmsPage);
-            return cmsPageResult;
+        if(cmsPage1 != null){
+            ExceptionCast.cast(CmsCode.CMS_ADDPAGE_EXISTSNAME);
         }
-        return new CmsPageResult(CommonCode.FAIL,null);
+        cmsPage.setPageId(null);//添加页面主键由spring data 自动生成
+        cmsPageRepository.save(cmsPage);
+        //返回结果
+        CmsPageResult cmsPageResult = new CmsPageResult(CommonCode.SUCCESS,cmsPage);
+        return cmsPageResult;
     }
 
     public CmsPage getById(String id) {

@@ -24,6 +24,13 @@ public class CmsPageController implements CmsPageControllerApi {
     @Autowired
     private CmsPageService cmsPageService;
 
+    /**
+     * 分页查询页面列表
+     * @param page
+     * @param size
+     * @param queryPageRequest
+     * @return
+     */
     @Override
     @GetMapping("/list/{page}/{size}")
     public QueryResponseResult findList(@PathVariable int page,
@@ -33,24 +40,45 @@ public class CmsPageController implements CmsPageControllerApi {
         return queryResponseResult;
     }
 
+    /**
+     * 添加页面
+     * @param cmsPage
+     * @return
+     */
     @Override
     @PostMapping("/add")
     public CmsPageResult add(@RequestBody CmsPage cmsPage) {
         return cmsPageService.add(cmsPage);
     }
 
+    /**
+     * 根据id获取页面
+     * @param id
+     * @return
+     */
     @Override
     @GetMapping("/get/{id}")
     public CmsPage findById(@PathVariable String id) {
         return cmsPageService.getById(id);
     }
 
+    /**
+     * 编辑页面信息
+     * @param id
+     * @param cmsPage
+     * @return
+     */
     @Override
     @PutMapping("/edit/{id}")
     public CmsPageResult edit(@PathVariable("id") String id, @RequestBody CmsPage cmsPage) {
         return cmsPageService.update(id, cmsPage);
     }
 
+    /**
+     * 根据id删除页面
+     * @param id
+     * @return
+     */
     @Override
     @DeleteMapping("/del/{id}")
     public ResponseResult delete(@PathVariable String id) {
