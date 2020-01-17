@@ -1,4 +1,4 @@
-package com.xuecheng.manage_cms;
+package com.xuecheng.manage_cms.dao;
 
 import com.xuecheng.framework.domain.cms.CmsPage;
 import com.xuecheng.framework.domain.cms.CmsPageParam;
