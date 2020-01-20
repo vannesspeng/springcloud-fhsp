@@ -1,15 +1,11 @@
 package com.xuecheng.framework.domain.cms;
 
 import lombok.Data;
-import lombok.Getter;
-import lombok.Setter;
 import lombok.ToString;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
-
 import java.util.Date;
-import java.util.List;
 
 /**
  * @Author: mrt.
@@ -33,6 +29,8 @@ public class CmsSite {
     private String sitePort;
     //站点访问地址
     private String siteWebPath;
+    //站点物理路径
+    private String sitePhysicalPath;
     //创建时间
     private Date siteCreateTime;
 

@@ -1,10 +1,9 @@
 package com.xuecheng.manage_cms.service;
 
+import com.alibaba.fastjson.JSON;
 import com.mongodb.client.gridfs.GridFSBucket;
 import com.mongodb.client.gridfs.GridFSDownloadStream;
 import com.mongodb.client.gridfs.model.GridFSFile;
-import com.xuecheng.framework.domain.cms.CmsConfig;
-import com.xuecheng.framework.domain.cms.CmsConfigModel;
 import com.xuecheng.framework.domain.cms.CmsPage;
 import com.xuecheng.framework.domain.cms.CmsTemplate;
 import com.xuecheng.framework.domain.cms.request.QueryPageRequest;
@@ -15,14 +14,16 @@ import com.xuecheng.framework.model.response.CommonCode;
 import com.xuecheng.framework.model.response.QueryResponseResult;
 import com.xuecheng.framework.model.response.QueryResult;
 import com.xuecheng.framework.model.response.ResponseResult;
+import com.xuecheng.manage_cms.config.RabbitmqConfig;
 import com.xuecheng.manage_cms.dao.CmsPageRepository;
 import com.xuecheng.manage_cms.dao.CmsTemplateRepository;
 import freemarker.cache.StringTemplateLoader;
 import freemarker.template.Configuration;
 import freemarker.template.Template;
-import freemarker.template.Version;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.bson.types.ObjectId;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.*;
 import org.springframework.data.mongodb.core.query.Criteria;
@@ -35,6 +36,8 @@ import org.springframework.ui.freemarker.FreeMarkerTemplateUtils;
 import org.springframework.web.client.RestTemplate;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 
@@ -57,6 +60,9 @@ public class CmsPageService {
 
     @Autowired
     private GridFsTemplate gridFsTemplate;
+
+    @Autowired
+    private RabbitTemplate rabbitTemplate;
 
     public QueryResponseResult findList(int page, int size, QueryPageRequest queryPageRequest) {
         //数据先检查再使用
@@ -228,4 +234,56 @@ public class CmsPageService {
         return body;
     }
 
+    public ResponseResult postPage(String pageId){
+        //1、执行静态化
+        String pageHtml = this.getPageHtml(pageId);
+        if(StringUtils.isEmpty(pageHtml)){
+            ExceptionCast.cast(CmsCode.CMS_GENERATEHTML_HTMLISNULL);
+        }
+        //2、保存静态化文件
+        CmsPage cmsPage = saveHtml(pageId, pageHtml);
+        //3、向mq发送消息，通知其他的服务器，从mongodb下载更新后的页面
+        sendPostPage(pageId);
+        return new ResponseResult(CommonCode.SUCCESS);
+    }
+
+    private void sendPostPage(String pageId) {
+        Optional<CmsPage> optional = cmsPageRepository.findById(pageId);
+        if(!optional.isPresent()){
+            ExceptionCast.cast(CmsCode.CMS_PAGE_NOTEXISTS);
+        }
+        CmsPage cmsPage = optional.get();
+        Map<String, String> map = new HashMap();
+        map.put("pageId", pageId);
+        String msg = JSON.toJSONString(map);
+        String siteId = cmsPage.getSiteId();
+        rabbitTemplate.convertAndSend(RabbitmqConfig.EX_ROUTING_CMS_POSTPAGE, siteId, msg);
+
+    }
+
+    private CmsPage saveHtml(String pageId, String content) {
+        //先要查询页面是否存在如果存在，则要先删除再保存新的页面数据
+        Optional<CmsPage> optional = cmsPageRepository.findById(pageId);
+        if(!optional.isPresent()){
+            ExceptionCast.cast(CmsCode.CMS_PAGE_NOTEXISTS);
+        }
+        CmsPage cmsPage = optional.get();
+        String htmlFileId = cmsPage.getHtmlFileId();
+        if(StringUtils.isNotEmpty(htmlFileId)){
+            //删除原有文件
+            gridFsTemplate.delete(Query.query(Criteria.where("_id").is(pageId)));
+        }
+        //存储文件
+        try {
+            InputStream inputStream = IOUtils.toInputStream(content, "utf-8");
+            ObjectId objectId = gridFsTemplate.store(inputStream, cmsPage.getPageName());
+            String fileId = objectId.toString();
+            cmsPage.setHtmlFileId(fileId);
+            cmsPageRepository.save(cmsPage);
+            return cmsPage;
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
 }
